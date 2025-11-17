@@ -1,0 +1,159 @@
+Objective: Create a full-stack application setup for a personal article CMS panel (similar to Sanity) using Prisma as the ORM with a SQL database. Image uploads will be handled by Firebase Storage.
+
+The core of this system is the "Article" and its related features. Please generate the necessary Prisma schema and describe the UI components needed for the admin panel.
+
+Core Data Models (Prisma Schema):
+
+User Model (Optional, but recommended):
+
+id (string, CUID or UUID)
+
+name (string, optional)
+
+email (string, unique, optional)
+
+avatarUrl (string, optional) - URL from Firebase Storage.
+
+articles (relation to Article[])
+
+comments (relation to Comment[])
+
+replies (relation to Reply[])
+
+likes (relation to Like[])
+
+Category Model:
+
+id (string, CUID or UUID)
+
+name (string, unique)
+
+articles (relation to Article[])
+
+Article Model:
+
+id (string, CUID or UUID)
+
+title (string) - Must not be empty.
+
+coverImageUrl (string, optional) - URL for the article's main hero image, hosted on Firebase Storage.
+
+content (string, JSON or large text) - This will store the rich text editor's output. Any images inside this content will be URLs pointing to Firebase Storage.
+
+createdAt (DateTime, default now())
+
+updatedAt (DateTime, updatedAt)
+
+author (relation to User, optional)
+
+category (relation to Category)
+
+categoryId (string) - Foreign key for the category.
+
+comments (relation to Comment[])
+
+likes (relation to Like[])
+
+Comment Model:
+
+id (string, CUID or UUID)
+
+text (string)
+
+createdAt (DateTime, default now())
+
+author (relation to User, optional)
+
+article (relation to Article)
+
+articleId (string)
+
+replies (relation to Reply[])
+
+Reply Model:
+
+id (string, CUID or UUID)
+
+text (string)
+
+createdAt (DateTime, default now())
+
+author (relation to User, optional)
+
+comment (relation to Comment)
+
+commentId (string)
+
+(Note: Replies cannot be replied to).
+
+Like Model:
+
+id (string, CUID or UUID)
+
+user (relation to User, optional)
+
+userId (string, optional)
+
+article (relation to Article)
+
+articleId (string)
+
+@@unique([userId, articleId]) - Ensures a user can only like an article once.
+
+CMS Admin Panel UI Requirements:
+
+Settings Page (Firebase Configuration):
+
+A secure page in the admin panel (e.g., under "Settings").
+
+Input fields for the user to provide their Firebase Project Configuration (apiKey, authDomain, projectId, storageBucket, messagingSenderId, appId).
+
+This configuration must be saved securely and used by the frontend to initialize the Firebase app for image uploads.
+
+Dashboard/Main View:
+
+A list/table of all "Articles".
+
+Columns for: "Title", "Category", "Date Created", "Like Count".
+
+A "Create New Article" button.
+
+Article Editor Page (Create/Edit):
+
+Title Input: A standard text field for Article.title.
+
+Category Selector: A dropdown menu populated from the Category model.
+
+Cover Image Uploader:
+
+A dedicated "Upload Cover Image" button/drag-and-drop area.
+
+Workflow: On file select, upload the image to Firebase Storage (e.g., to a covers/ path).
+
+On success, save the returned downloadURL to the Article.coverImageUrl field.
+
+Display a thumbnail preview of the uploaded cover image.
+
+Article Box (Rich Text Editor):
+
+A rich text editor (like Tiptap, Lexical, etc.) with standard controls (headings, bold, lists, links, code blocks).
+
+Firebase Image Button: A button in the editor's toolbar (e.g., "Upload Image").
+
+Upload Workflow:
+
+User clicks the button.
+
+A file picker opens.
+
+The frontend uploads the selected image to Firebase Storage (e.g., to article-content/<article-id>/<image-filename>).
+
+On successful upload, the Firebase downloadURL is retrieved.
+
+The editor inserts an image tag (<img> or Markdown) into the content at the cursor's position using that URL.
+
+Save/Publish Button: To create or update the article.
+
+Comments Management View (Optional):
+
+A panel to view, moderate, and delete comments and replies.

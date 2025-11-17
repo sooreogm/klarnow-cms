@@ -1,0 +1,30 @@
+
+
+services:
+    nextcms:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        ports:
+            - "5500:5500"
+        env_file:
+            - .env
+        environment:
+            - NODE_ENV=production
+            - NODE_TLS_REJECT_UNAUTHORIZED=0
+            - PORT=5500
+        restart: unless-stopped
+        healthcheck:
+            test:
+                [
+                    "CMD",
+                    "wget",
+                    "--quiet",
+                    "--tries=1",
+                    "--spider",
+                    "http://localhost:5500/api/test",
+                ]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 40s

@@ -8,13 +8,140 @@ import {
     insertCommentSchema,
     insertReplySchema,
     insertLikeSchema,
-    insertFirebaseSettingsSchema,
+    type InsertArticle,
 } from "@shared/schema";
+import {
+    PocketBaseUploadError,
+    UploadValidationError,
+    readMultipartFormData,
+    uploadImageToPocketBase,
+} from "./pocketbase";
+import {
+    buildAuthSessionResponse,
+    getAdminUsername,
+    isValidAdminPassword,
+    requireApiAccess,
+    SESSION_COOKIE_NAME,
+} from "./auth";
+import type { LoginRequestBody } from "@shared/auth";
+
+function hasOwnProperty(value: object, key: string) {
+    return Object.prototype.hasOwnProperty.call(value, key);
+}
+
+function normalizeNullableArticleField(value: unknown) {
+    if (typeof value !== "string") {
+        return value;
+    }
+
+    const normalized = value.trim();
+    return normalized === "" ? null : normalized;
+}
+
+function normalizeArticlePayload(
+    payload: Partial<InsertArticle>
+): Partial<InsertArticle> {
+    const normalizedPayload: Partial<InsertArticle> = { ...payload };
+
+    if (hasOwnProperty(payload, "challengeId")) {
+        normalizedPayload.challengeId = normalizeNullableArticleField(
+            payload.challengeId
+        ) as InsertArticle["challengeId"];
+    }
+
+    if (hasOwnProperty(payload, "coverImageUrl")) {
+        normalizedPayload.coverImageUrl = normalizeNullableArticleField(
+            payload.coverImageUrl
+        ) as InsertArticle["coverImageUrl"];
+    }
+
+    if (hasOwnProperty(payload, "description")) {
+        normalizedPayload.description = normalizeNullableArticleField(
+            payload.description
+        ) as InsertArticle["description"];
+    }
+
+    return normalizedPayload;
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
     // Health endpoint for Docker/Deploy checks
     app.get("/api/test", (_req, res) => {
         res.json({ ok: true });
+    });
+
+    app.get("/api/auth/session", (req, res) => {
+        res.json(buildAuthSessionResponse(req));
+    });
+
+    app.post("/api/auth/login", (req, res, next) => {
+        const { password } = (req.body ?? {}) as Partial<LoginRequestBody>;
+
+        if (typeof password !== "string" || password.trim().length === 0) {
+            return res.status(400).json({ error: "Password is required" });
+        }
+
+        if (!isValidAdminPassword(password)) {
+            return res.status(401).json({ error: "Invalid credentials" });
+        }
+
+        req.session.regenerate((regenerateError) => {
+            if (regenerateError) {
+                return next(regenerateError);
+            }
+
+            req.session.isAuthenticated = true;
+            req.session.username = getAdminUsername();
+
+            req.session.save((saveError) => {
+                if (saveError) {
+                    return next(saveError);
+                }
+
+                res.json(buildAuthSessionResponse(req));
+            });
+        });
+    });
+
+    app.post("/api/auth/logout", (req, res, next) => {
+        if (!req.session) {
+            return res.json({ authenticated: false, username: null });
+        }
+
+        req.session.destroy((destroyError) => {
+            if (destroyError) {
+                return next(destroyError);
+            }
+
+            res.clearCookie(SESSION_COOKIE_NAME);
+            res.json({ authenticated: false, username: null });
+        });
+    });
+
+    app.use("/api", requireApiAccess);
+
+    app.post("/api/uploads/images", async (req, res) => {
+        try {
+            const formData = await readMultipartFormData(req);
+            const upload = await uploadImageToPocketBase(formData);
+
+            res.status(201).json(upload);
+        } catch (error) {
+            console.error("Error in POST /api/uploads/images:", error);
+
+            if (error instanceof UploadValidationError) {
+                return res.status(400).json({ error: error.message });
+            }
+
+            if (error instanceof PocketBaseUploadError) {
+                return res.status(502).json({ error: error.message });
+            }
+
+            res.status(500).json({
+                error: "Failed to upload image",
+                details: error instanceof Error ? error.message : String(error),
+            });
+        }
     });
 
     // Stats endpoint
@@ -249,7 +376,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     app.post("/api/articles", async (req, res) => {
         try {
-            const parsed = insertArticleSchema.safeParse(req.body);
+            const parsed = insertArticleSchema.safeParse(
+                normalizeArticlePayload(req.body)
+            );
             if (!parsed.success) {
                 return res.status(400).json({ error: parsed.error.message });
             }
@@ -266,9 +395,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     app.patch("/api/articles/:id", async (req, res) => {
         try {
+            const parsed = insertArticleSchema.safeParse(
+                normalizeArticlePayload(req.body)
+            );
+            if (!parsed.success) {
+                return res.status(400).json({ error: parsed.error.message });
+            }
             const article = await storage.updateArticle(
                 req.params.id,
-                req.body
+                parsed.data
             );
             if (!article) {
                 return res.status(404).json({ error: "Article not found" });
@@ -420,43 +555,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
         }
     });
-
-    // Firebase settings endpoints
-    app.get("/api/firebase-settings", async (_req, res) => {
-        try {
-            const settings = await storage.getFirebaseSettings();
-            if (!settings) {
-                return res
-                    .status(404)
-                    .json({ error: "Firebase settings not found" });
-            }
-            res.json(settings);
-        } catch (error) {
-            console.error("Error in /api/firebase-settings:", error);
-            res.status(500).json({
-                error: "Failed to fetch Firebase settings",
-                details: error instanceof Error ? error.message : String(error),
-            });
-        }
-    });
-
-    app.post("/api/firebase-settings", async (req, res) => {
-        try {
-            const parsed = insertFirebaseSettingsSchema.safeParse(req.body);
-            if (!parsed.success) {
-                return res.status(400).json({ error: parsed.error.message });
-            }
-            const settings = await storage.saveFirebaseSettings(parsed.data);
-            res.json(settings);
-        } catch (error) {
-            console.error("Error in POST /api/firebase-settings:", error);
-            res.status(500).json({
-                error: "Failed to save Firebase settings",
-                details: error instanceof Error ? error.message : String(error),
-            });
-        }
-    });
-
     const httpServer = createServer(app);
     return httpServer;
 }

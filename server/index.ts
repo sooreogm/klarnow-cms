@@ -3,6 +3,7 @@ import "./env-loader";
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import cors from "cors";
+import { createSessionMiddleware, ensureAuthConfiguration } from "./auth";
 
 const app = express();
 
@@ -12,7 +13,20 @@ declare module "http" {
     }
 }
 
-app.use(cors());
+const configuredAppOrigins = process.env.APP_ORIGIN?.split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+app.use(
+    cors(
+        configuredAppOrigins?.length
+            ? {
+                  origin: configuredAppOrigins,
+                  credentials: true,
+              }
+            : undefined
+    )
+);
 app.use(
     express.json({
         verify: (req, _res, buf) => {
@@ -21,6 +35,14 @@ app.use(
     })
 );
 app.use(express.urlencoded({ extended: false }));
+
+ensureAuthConfiguration();
+
+if (process.env.NODE_ENV === "production") {
+    app.set("trust proxy", 1);
+}
+
+app.use(createSessionMiddleware());
 
 app.use((req, res, next) => {
     const start = Date.now();

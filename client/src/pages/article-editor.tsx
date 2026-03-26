@@ -29,11 +29,13 @@ import {
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { uploadImageToFirebase, isFirebaseInitialized } from "@/lib/firebase";
+import { IMAGE_UPLOAD_ACCEPT, uploadCmsImage } from "@/lib/uploads";
 import type { Article, Category, Challenge, InsertArticle } from "@shared/schema";
 import { insertArticleSchema } from "@shared/schema";
 import { EditorToolbar } from "@/components/editor-toolbar";
 import { CoverImageUpload } from "@/components/cover-image-upload";
+
+const NO_CHALLENGE_VALUE = "__none__";
 
 export default function ArticleEditor() {
   const params = useParams();
@@ -118,7 +120,12 @@ export default function ArticleEditor() {
   const saveMutation = useMutation({
     mutationFn: async (data: InsertArticle) => {
       setSaveStatus("saving");
-      const payload = { ...data, coverImageUrl: coverImageUrl || null };
+      const payload: InsertArticle = {
+        ...data,
+        coverImageUrl: coverImageUrl || null,
+        description: data.description?.trim() ? data.description : null,
+        challengeId: data.challengeId?.trim() ? data.challengeId : null,
+      };
       
       if (isEditing) {
         const res = await apiRequest("PATCH", `/api/articles/${articleId}`, payload);
@@ -154,18 +161,9 @@ export default function ArticleEditor() {
   });
 
   const handleImageUpload = async () => {
-    if (!isFirebaseInitialized()) {
-      toast({
-        title: "Firebase not configured",
-        description: "Please configure Firebase settings first",
-        variant: "destructive",
-      });
-      return;
-    }
-
     const input = document.createElement("input");
     input.type = "file";
-    input.accept = "image/*";
+    input.accept = IMAGE_UPLOAD_ACCEPT;
     
     input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
@@ -173,8 +171,11 @@ export default function ArticleEditor() {
 
       setIsUploadingImage(true);
       try {
-        const imagePath = `article-content/${articleId || 'new'}/${Date.now()}-${file.name}`;
-        const imageUrl = await uploadImageToFirebase(file, imagePath);
+        const imageUrl = await uploadCmsImage({
+          file,
+          kind: "article-content",
+          articleId: articleId || undefined,
+        });
         
         editor?.commands.setImage({ src: imageUrl });
         
@@ -185,7 +186,8 @@ export default function ArticleEditor() {
       } catch (error) {
         toast({
           title: "Error",
-          description: "Failed to upload image",
+          description:
+            error instanceof Error ? error.message : "Failed to upload image",
           variant: "destructive",
         });
       } finally {
@@ -285,13 +287,23 @@ export default function ArticleEditor() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Challenge (optional)</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select
+                      onValueChange={(value) =>
+                        field.onChange(
+                          value === NO_CHALLENGE_VALUE ? "" : value
+                        )
+                      }
+                      value={field.value ? field.value : NO_CHALLENGE_VALUE}
+                    >
                       <FormControl>
                         <SelectTrigger data-testid="select-challenge">
                           <SelectValue placeholder="Select a challenge" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
+                        <SelectItem value={NO_CHALLENGE_VALUE}>
+                          No challenge
+                        </SelectItem>
                         {challenges?.map((challenge) => (
                           <SelectItem key={challenge.id} value={challenge.id}>
                             {challenge.name}
@@ -327,6 +339,7 @@ export default function ArticleEditor() {
                     <FormControl>
                       <textarea
                         {...field}
+                        value={field.value ?? ""}
                         rows={3}
                         placeholder="Short description of the article"
                         className="w-full mt-2 border rounded-md p-3 bg-background"

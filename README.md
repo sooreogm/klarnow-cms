@@ -8,6 +8,7 @@ A full-stack article CMS built with React, Vite, Express, and PostgreSQL.
 -   **Backend**: Express.js, Node.js, TypeScript
 -   **Database**: PostgreSQL (Aiven), Drizzle ORM
 -   **Features**: Rich text editor (TipTap), Authentication ready, Responsive design
+-   **Media uploads**: Server-side image uploads to PocketBase
 
 ## Quick Start
 
@@ -34,6 +35,9 @@ A full-stack article CMS built with React, Vite, Express, and PostgreSQL.
     NODE_ENV=development
     NODE_TLS_REJECT_UNAUTHORIZED=0
     PORT=5500
+    POCKETBASE_URL=https://pbase.example.com
+    POCKETBASE_ADMIN_EMAIL=service-account@example.com
+    POCKETBASE_ADMIN_PASSWORD=replace-me
     ```
 
 3. **Push database schema:**
@@ -103,6 +107,7 @@ NextCMS/
 -   `GET /api/articles` - Get all articles
 -   `POST /api/articles` - Create article
 -   `GET /api/comments` - Get all comments
+-   `POST /api/uploads/images` - Upload article and cover images to PocketBase
 -   And more...
 
 ## Environment Variables
@@ -111,6 +116,9 @@ NextCMS/
 -   `NODE_ENV` - Environment (development/production)
 -   `NODE_TLS_REJECT_UNAUTHORIZED` - Set to 0 for self-signed certificates
 -   `PORT` - Server port (default: 5500)
+-   `POCKETBASE_URL` - Hosted PocketBase base URL
+-   `POCKETBASE_ADMIN_EMAIL` - PocketBase server-side upload account email
+-   `POCKETBASE_ADMIN_PASSWORD` - PocketBase server-side upload account password
 
 ## License
 

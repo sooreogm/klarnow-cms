@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is a full-stack article content management system built with React, Express, and PostgreSQL. The application provides a modern admin panel for managing articles, categories, comments, and user interactions. It features a rich text editor powered by TipTap, Firebase Storage integration for image uploads, and a comprehensive database schema for content organization.
+This is a full-stack article content management system built with React, Express, and PostgreSQL. The application provides a modern admin panel for managing articles, categories, comments, and user interactions. It features a rich text editor powered by TipTap, PocketBase-backed image uploads, and a comprehensive database schema for content organization.
 
 The system is designed as a personal CMS similar to Sanity, with a focus on clean UI/UX inspired by Linear, Notion, and modern SaaS admin panels. The architecture supports article creation and editing, category management, commenting with nested replies, and social features like likes.
 
@@ -70,7 +70,6 @@ Preferred communication style: Simple, everyday language.
 - Comments: Article comments with author attribution
 - Replies: Nested comment replies
 - Likes: User-article like tracking with unique constraints
-- Firebase Settings: Storage configuration
 
 **Key Architectural Decisions**
 - ORM choice (Drizzle): Provides type safety and lightweight abstraction over SQL
@@ -80,11 +79,10 @@ Preferred communication style: Simple, everyday language.
 
 ### External Dependencies
 
-**Firebase Storage**
+**PocketBase Uploads**
 - Used for image hosting (cover images and inline editor images)
-- Configuration stored in database (firebase_settings table)
-- Client-side upload with Firebase SDK
-- Settings managed through admin panel
+- Uploads are handled server-side through the PocketBase API
+- PocketBase credentials are stored in environment variables
 
 **Database Provider**
 - Neon Serverless PostgreSQL
@@ -106,7 +104,7 @@ Preferred communication style: Simple, everyday language.
 - Replit plugins: Development tooling and error overlays
 
 **Key Integration Points**
-- Firebase initialization happens client-side based on settings from API
-- Image uploads go directly from client to Firebase Storage
+- Image uploads are sent from the client to the Express API
+- The server authenticates to PocketBase and returns the uploaded file URL
 - URLs are stored in PostgreSQL (no binary data in database)
 - Environment variables required: `DATABASE_URL` for database connection

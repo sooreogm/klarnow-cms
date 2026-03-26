@@ -117,16 +117,6 @@
   - SEO preview card
   - Publishing options (Save as draft checkbox)
 
-### Settings Page
-
-**Firebase Configuration Form:**
-- Section header: "Firebase Storage Configuration" with description text
-- Form layout: 2-column grid (label | input) with gap-6
-- Input fields: Full-width with h-10, border rounded
-- Field list: API Key, Auth Domain, Project ID, Storage Bucket, Messaging Sender ID, App ID
-- Security note: Prominent alert box above form explaining secure storage
-- Save button: Bottom-right sticky bar with "Save Configuration" button
-
 **Categories Management:**
 - Two-column layout: Category list (left, w-1/3) | Edit form (right, flex-1)
 - List item: py-3 px-4 with hover state, click to edit

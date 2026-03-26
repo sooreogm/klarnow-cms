@@ -1,7 +1,21 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+export const AUTH_REQUIRED_EVENT = "cms-auth-required";
+
+function dispatchAuthRequiredEvent() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.dispatchEvent(new CustomEvent(AUTH_REQUIRED_EVENT));
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
+    if (res.status === 401) {
+      dispatchAuthRequiredEvent();
+    }
+
     const text = (await res.text()) || res.statusText;
     throw new Error(`${res.status}: ${text}`);
   }
@@ -12,10 +26,14 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
+  const isFormData =
+    typeof FormData !== "undefined" && data instanceof FormData;
+
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
+    headers:
+      data && !isFormData ? { "Content-Type": "application/json" } : {},
+    body: !data ? undefined : isFormData ? data : JSON.stringify(data),
     credentials: "include",
   });
 

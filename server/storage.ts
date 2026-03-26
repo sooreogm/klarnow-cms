@@ -8,7 +8,6 @@ import {
   comments,
   replies,
   likes,
-  firebaseSettings,
   type User,
   type InsertUser,
   type Category,
@@ -25,8 +24,6 @@ import {
   type InsertReply,
   type Like,
   type InsertLike,
-  type FirebaseSettings,
-  type InsertFirebaseSettings,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -68,10 +65,6 @@ export interface IStorage {
   // Like methods
   createLike(like: InsertLike): Promise<Like>;
   deleteLike(id: string): Promise<void>;
-
-  // Firebase settings methods
-  getFirebaseSettings(): Promise<FirebaseSettings | undefined>;
-  saveFirebaseSettings(settings: InsertFirebaseSettings): Promise<FirebaseSettings>;
 
   // Stats methods
   getStats(): Promise<{ totalArticles: number; totalLikes: number; totalCategories: number }>;
@@ -261,19 +254,6 @@ export class DatabaseStorage implements IStorage {
 
   async deleteLike(id: string): Promise<void> {
     await db.delete(likes).where(eq(likes.id, id));
-  }
-
-  // Firebase settings methods
-  async getFirebaseSettings(): Promise<FirebaseSettings | undefined> {
-    const [settings] = await db.select().from(firebaseSettings).orderBy(desc(firebaseSettings.updatedAt)).limit(1);
-    return settings || undefined;
-  }
-
-  async saveFirebaseSettings(insertSettings: InsertFirebaseSettings): Promise<FirebaseSettings> {
-    // Delete old settings and insert new one
-    await db.delete(firebaseSettings);
-    const [settings] = await db.insert(firebaseSettings).values(insertSettings).returning();
-    return settings;
   }
 
   // Stats methods

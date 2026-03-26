@@ -98,20 +98,6 @@ export const likes = pgTable("likes", {
     userId: varchar("user_id").default(""),
 });
 
-// Firebase settings table (stores Firebase configuration)
-export const firebaseSettings = pgTable("firebase_settings", {
-    id: varchar("id")
-        .primaryKey()
-        .default(sql`gen_random_uuid()`),
-    apiKey: text("api_key").notNull(),
-    authDomain: text("auth_domain").notNull(),
-    projectId: text("project_id").notNull(),
-    storageBucket: text("storage_bucket").notNull(),
-    messagingSenderId: text("messaging_sender_id").notNull(),
-    appId: text("app_id").notNull(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
-
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
     articles: many(articles),
@@ -198,12 +184,6 @@ export const insertReplySchema = createInsertSchema(replies).omit({
     createdAt: true,
 });
 export const insertLikeSchema = createInsertSchema(likes).omit({ id: true });
-export const insertFirebaseSettingsSchema = createInsertSchema(
-    firebaseSettings
-).omit({
-    id: true,
-    updatedAt: true,
-});
 
 // Select types
 export type User = typeof users.$inferSelect;
@@ -213,7 +193,6 @@ export type Article = typeof articles.$inferSelect;
 export type Comment = typeof comments.$inferSelect;
 export type Reply = typeof replies.$inferSelect;
 export type Like = typeof likes.$inferSelect;
-export type FirebaseSettings = typeof firebaseSettings.$inferSelect;
 
 // Insert types
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -223,9 +202,6 @@ export type InsertArticle = z.infer<typeof insertArticleSchema>;
 export type InsertComment = z.infer<typeof insertCommentSchema>;
 export type InsertReply = z.infer<typeof insertReplySchema>;
 export type InsertLike = z.infer<typeof insertLikeSchema>;
-export type InsertFirebaseSettings = z.infer<
-    typeof insertFirebaseSettingsSchema
->;
 
 // Extended types for API responses with relations
 export type ArticleWithRelations = Article & {

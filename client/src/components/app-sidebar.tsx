@@ -1,4 +1,4 @@
-import { Home, FolderTree, MessageSquare, Settings, Trophy } from "lucide-react";
+import { Home, FolderTree, MessageSquare, Trophy } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -35,12 +35,6 @@ const menuItems = [
     url: "/comments",
     icon: MessageSquare,
     testId: "link-comments",
-  },
-  {
-    title: "Settings",
-    url: "/settings",
-    icon: Settings,
-    testId: "link-settings",
   },
 ];
 

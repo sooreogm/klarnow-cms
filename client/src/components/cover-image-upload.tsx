@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { uploadImageToFirebase, isFirebaseInitialized } from "@/lib/firebase";
+import { IMAGE_UPLOAD_ACCEPT, uploadCmsImage } from "@/lib/uploads";
 
 interface CoverImageUploadProps {
   imageUrl: string;
@@ -20,19 +20,14 @@ export function CoverImageUpload({
   const [isDragging, setIsDragging] = useState(false);
 
   const handleUpload = async (file: File) => {
-    if (!isFirebaseInitialized()) {
-      toast({
-        title: "Firebase not configured",
-        description: "Please configure Firebase settings first",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setIsUploading(true);
     try {
-      const imagePath = `covers/${articleId}-${Date.now()}.${file.name.split('.').pop()}`;
-      const url = await uploadImageToFirebase(file, imagePath);
+      const url = await uploadCmsImage({
+        file,
+        kind: "cover",
+        articleId,
+        alt: "Article cover image",
+      });
       onImageChange(url);
       toast({
         title: "Success",
@@ -41,7 +36,10 @@ export function CoverImageUpload({
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to upload cover image",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to upload cover image",
         variant: "destructive",
       });
     } finally {
@@ -113,7 +111,7 @@ export function CoverImageUpload({
         <input
           id="cover-upload"
           type="file"
-          accept="image/*"
+          accept={IMAGE_UPLOAD_ACCEPT}
           className="hidden"
           onChange={handleFileInput}
         />
@@ -156,7 +154,7 @@ export function CoverImageUpload({
           <input
             id="cover-upload"
             type="file"
-            accept="image/*"
+            accept={IMAGE_UPLOAD_ACCEPT}
             className="hidden"
             onChange={handleFileInput}
           />

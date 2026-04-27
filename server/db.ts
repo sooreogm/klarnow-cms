@@ -3,6 +3,7 @@ import "./env-loader";
 import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "@shared/schema";
+import { getPgSslConfig } from "./db-ssl";
 
 if (!process.env.DATABASE_URL) {
     throw new Error(
@@ -20,12 +21,11 @@ const cleanConnectionString = process.env.DATABASE_URL.replace(
     .replace(/[?&]sslkey=[^&]*/gi, "")
     .replace(/[?&]sslrootcert=[^&]*/gi, "");
 
+const ssl = getPgSslConfig();
+
 export const pool = new Pool({
     connectionString: cleanConnectionString,
-    // Always enable SSL with self-signed certificate support for cloud databases
-    ssl: {
-        rejectUnauthorized: false,
-    },
+    ...(ssl ? { ssl } : {}),
 });
 
 // Test database connection on startup

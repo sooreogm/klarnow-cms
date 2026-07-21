@@ -1,7 +1,4 @@
-import type { Request as ExpressRequest } from "express";
-import { Readable } from "node:stream";
-
-const MAX_IMAGE_UPLOAD_BYTES = 5 * 1024 * 1024;
+export const MAX_IMAGE_UPLOAD_BYTES = 5 * 1024 * 1024;
 const ALLOWED_IMAGE_MIME_TYPES = new Set([
   "image/jpeg",
   "image/png",
@@ -26,6 +23,20 @@ interface PocketBaseCollectionResponse {
   fields?: Array<{ name?: string }>;
 }
 
+export interface UploadedImageFile {
+  buffer: Buffer;
+  originalname: string;
+  mimetype: string;
+  size: number;
+}
+
+export interface UploadImageInput {
+  file: UploadedImageFile | undefined;
+  kind?: string;
+  articleId?: string;
+  alt?: string;
+}
+
 export class UploadValidationError extends Error {}
 
 export class PocketBaseUploadError extends Error {}
@@ -46,28 +57,6 @@ function getPocketBaseBaseUrl(): string {
   return getRequiredEnv("POCKETBASE_URL").replace(/\/+$/, "");
 }
 
-function buildHeaders(req: ExpressRequest): Headers {
-  const headers = new Headers();
-
-  for (const [key, value] of Object.entries(req.headers)) {
-    if (Array.isArray(value)) {
-      value.forEach((entry) => headers.append(key, entry));
-      continue;
-    }
-
-    if (value) {
-      headers.set(key, value);
-    }
-  }
-
-  return headers;
-}
-
-function readFormValue(formData: FormData, key: string): string {
-  const value = formData.get(key);
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function getErrorMessage(
   body: { message?: string } | null,
   fallbackMessage: string,
@@ -75,8 +64,8 @@ function getErrorMessage(
   return body?.message?.trim() || fallbackMessage;
 }
 
-function assertValidImage(file: File) {
-  if (!ALLOWED_IMAGE_MIME_TYPES.has(file.type)) {
+function assertValidImage(file: UploadedImageFile) {
+  if (!ALLOWED_IMAGE_MIME_TYPES.has(file.mimetype)) {
     throw new UploadValidationError(
       "Only JPEG, PNG, WEBP, and GIF images are allowed.",
     );
@@ -105,31 +94,6 @@ function buildPublicFileUrl(recordId: string, fileName: string): string {
   return `${getPocketBaseBaseUrl()}/api/files/${POCKETBASE_COLLECTION_NAME}/${recordId}/${encodeURIComponent(
     fileName,
   )}`;
-}
-
-export async function readMultipartFormData(
-  req: ExpressRequest,
-): Promise<FormData> {
-  const contentType = req.headers["content-type"] || "";
-
-  if (!contentType.startsWith("multipart/form-data")) {
-    throw new UploadValidationError(
-      "Uploads must be sent as multipart/form-data.",
-    );
-  }
-
-  const requestInit: RequestInit & { duplex: "half" } = {
-    method: req.method,
-    headers: buildHeaders(req),
-    body: Readable.toWeb(req) as BodyInit,
-    duplex: "half",
-  };
-  const request = new Request(
-    "http://localhost/api/uploads/images",
-    requestInit,
-  );
-
-  return await request.formData();
 }
 
 async function authenticatePocketBase(): Promise<string> {
@@ -191,26 +155,31 @@ async function getCollectionFieldNames(token: string): Promise<Set<string>> {
   return fieldNames;
 }
 
-export async function uploadImageToPocketBase(
-  formData: FormData,
-): Promise<{ recordId: string; url: string }> {
-  const file = formData.get(POCKETBASE_FILE_FIELD_NAME);
-
-  if (!(file instanceof File)) {
+export async function uploadImageToPocketBase({
+  file,
+  kind: rawKind,
+  articleId: rawArticleId,
+  alt: rawAlt,
+}: UploadImageInput): Promise<{ recordId: string; url: string }> {
+  if (!file) {
     throw new UploadValidationError("An image file is required.");
   }
 
   assertValidImage(file);
 
   const uploadFormData = new FormData();
-  const kind = readFormValue(formData, "kind") || "article-image";
-  const articleId = readFormValue(formData, "articleId");
-  const alt = readFormValue(formData, "alt");
+  const kind = rawKind?.trim() || "article-image";
+  const articleId = rawArticleId?.trim() || "";
+  const alt = rawAlt?.trim() || "";
 
   const token = await authenticatePocketBase();
   const collectionFieldNames = await getCollectionFieldNames(token);
 
-  uploadFormData.set(POCKETBASE_FILE_FIELD_NAME, file, file.name);
+  uploadFormData.set(
+    POCKETBASE_FILE_FIELD_NAME,
+    new Blob([file.buffer], { type: file.mimetype }),
+    file.originalname,
+  );
 
   if (collectionFieldNames.has("kind")) {
     uploadFormData.set("kind", kind);

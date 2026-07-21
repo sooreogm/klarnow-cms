@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import multer from "multer";
 import { storage } from "./storage";
 import {
     insertCategorySchema,
@@ -11,9 +12,9 @@ import {
     type InsertArticle,
 } from "@shared/schema";
 import {
+    MAX_IMAGE_UPLOAD_BYTES,
     PocketBaseUploadError,
     UploadValidationError,
-    readMultipartFormData,
     uploadImageToPocketBase,
 } from "./pocketbase";
 import {
@@ -120,28 +121,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     app.use("/api", requireApiAccess);
 
-    app.post("/api/uploads/images", async (req, res) => {
-        try {
-            const formData = await readMultipartFormData(req);
-            const upload = await uploadImageToPocketBase(formData);
+    const imageUpload = multer({
+        storage: multer.memoryStorage(),
+        limits: { fileSize: MAX_IMAGE_UPLOAD_BYTES },
+    }).single("image");
 
-            res.status(201).json(upload);
-        } catch (error) {
-            console.error("Error in POST /api/uploads/images:", error);
+    app.post("/api/uploads/images", (req, res) => {
+        imageUpload(req, res, async (multerError: unknown) => {
+            try {
+                if (multerError) {
+                    const message =
+                        multerError instanceof multer.MulterError &&
+                        multerError.code === "LIMIT_FILE_SIZE"
+                            ? "Image uploads must be 5MB or smaller."
+                            : multerError instanceof Error
+                              ? multerError.message
+                              : "Invalid upload.";
 
-            if (error instanceof UploadValidationError) {
-                return res.status(400).json({ error: error.message });
+                    return res.status(400).json({ error: message });
+                }
+
+                const upload = await uploadImageToPocketBase({
+                    file: req.file,
+                    kind: typeof req.body?.kind === "string" ? req.body.kind : undefined,
+                    articleId:
+                        typeof req.body?.articleId === "string"
+                            ? req.body.articleId
+                            : undefined,
+                    alt: typeof req.body?.alt === "string" ? req.body.alt : undefined,
+                });
+
+                res.status(201).json(upload);
+            } catch (error) {
+                console.error("Error in POST /api/uploads/images:", error);
+
+                if (error instanceof UploadValidationError) {
+                    return res.status(400).json({ error: error.message });
+                }
+
+                if (error instanceof PocketBaseUploadError) {
+                    return res.status(502).json({ error: error.message });
+                }
+
+                res.status(500).json({
+                    error: "Failed to upload image",
+                    details: error instanceof Error ? error.message : String(error),
+                });
             }
-
-            if (error instanceof PocketBaseUploadError) {
-                return res.status(502).json({ error: error.message });
-            }
-
-            res.status(500).json({
-                error: "Failed to upload image",
-                details: error instanceof Error ? error.message : String(error),
-            });
-        }
+        });
     });
 
     // Stats endpoint
